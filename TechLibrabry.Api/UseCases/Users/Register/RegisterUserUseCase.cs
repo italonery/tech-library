@@ -1,5 +1,8 @@
-﻿using TechLibrabry.Api.Infraestructure;
+﻿using FluentValidation.Results;
 using TechLibrary.Api.Domain.Entities;
+using TechLibrary.Api.Infraestructure.DataAccess;
+using TechLibrary.Api.Infraestructure.Security.Cryptography;
+using TechLibrary.Api.Infraestructure.Security.Tokens.Access;
 using TechLibrary.Communication.Requests;
 using TechLibrary.Communication.Responses;
 using TechLibrary.Exception;
@@ -10,31 +13,42 @@ namespace TechLibrabry.Api.UseCases.Users.Register
     {
         public ResponseRegisteredUserJson Execute(RequestUserJson request)
         {
-            Validate(request);
+            var dbContext = new TechLibraryDbContext();
 
-            var entity = new User
+            Validate(request, dbContext);
+
+            var cryptography = new BCryptAlgorithm();
+
+            var user = new User
             {
                 Email = request.Email,
                 Name = request.Name,
-                Password = request.Password,
+                Password = cryptography.HashPassword(request.Password),
             };
 
-            var dbContext = new TechLibraryDbContext();
-
-            dbContext.Users.Add(entity);
+            dbContext.Users.Add(user);
             dbContext.SaveChanges();
+
+            var tokenGenerator = new JwtTokenGenerator();
 
             return new ResponseRegisteredUserJson
             {
-                Name = entity.Name,
+                Name = user.Name,
+                AccessToken = tokenGenerator.Generate(user),
             };
         }
 
-        private void Validate(RequestUserJson request)
+        private void Validate(RequestUserJson request, TechLibraryDbContext dbContext)
         {
             var validator = new RegisterUserValidator();
 
             var result = validator.Validate(request);
+
+            var existUserWithEmail = dbContext.Users.Any(user => user.Email.Equals(request.Email));
+            if (existUserWithEmail)
+            {
+                result.Errors.Add(new ValidationFailure("Email", "E-mail já registrado na plataforma"));
+            }
 
             // !result.IsValid or result.IsValid == false
             if (result.IsValid == false)
