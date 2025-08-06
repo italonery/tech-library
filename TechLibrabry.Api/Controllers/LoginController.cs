@@ -1,7 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using TechLibrary.Api.UseCases.Login.DoLogin;
 using TechLibrary.Communication.Requests;
-using TechLibrary.Communication.Responses;
 
 namespace TechLibrary.Api.Controllers
 {
